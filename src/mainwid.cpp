@@ -35,15 +35,19 @@ MainWid::MainWid(QMainWindow *parent) :
     m_stMenu(this),
     m_stPlaylist(this),
     m_stTitle(this),
-    m_bMoveDrag(false)
+    m_bMoveDrag(false),
+    m_stActExit(this),
+    m_stActAbout(this),
+    m_stActOpen(this),
+    m_stActFullscreen(this)
 {
     ui->setupUi(this);
     //无边框、无系统菜单、 任务栏点击最小化
     setWindowFlags(Qt::FramelessWindowHint /*| Qt::WindowSystemMenuHint*/ | Qt::WindowMinimizeButtonHint);
     //设置任务栏图标
-    this->setWindowIcon(QIcon(":/Resources/player.png"));
+    this->setWindowIcon(QIcon("://res/player.png"));
     //加载样式
-    QString qss = GlobalHelper::GetQssStr(":/Resources/qss/mainwid.css");
+    QString qss = GlobalHelper::GetQssStr("://res/qss/mainwid.css");
     setStyleSheet(qss);
 
     // 追踪鼠标 用于播放时隐藏鼠标
@@ -139,7 +143,7 @@ bool MainWid::Init()
     m_stActAbout.setText("关于");
     m_stMenu.addAction(&m_stActAbout);
     
-    m_stActExit.setText(QString::fromLocal8Bit("退出"));
+    m_stActExit.setText("退出");
     m_stMenu.addAction(&m_stActExit);
 
 
@@ -184,6 +188,10 @@ bool MainWid::ConnectSignalSlots()
     connect(ui->ShowWid, &Show::SigPlayOrPause, VideoCtl::GetInstance(), &VideoCtl::OnPause);
     connect(ui->ShowWid, &Show::SigStop, VideoCtl::GetInstance(), &VideoCtl::OnStop);
     connect(ui->ShowWid, &Show::SigShowMenu, this, &MainWid::OnShowMenu);
+    connect(ui->ShowWid, &Show::SigSeekForward, VideoCtl::GetInstance(), &VideoCtl::OnSeekForward);
+    connect(ui->ShowWid, &Show::SigSeekBack, VideoCtl::GetInstance(), &VideoCtl::OnSeekBack);
+    connect(ui->ShowWid, &Show::SigAddVolume, VideoCtl::GetInstance(), &VideoCtl::OnAddVolume);
+    connect(ui->ShowWid, &Show::SigSubVolume, VideoCtl::GetInstance(), &VideoCtl::OnSubVolume);
 
     connect(ui->CtrlBarWid, &CtrlBar::SigShowOrHidePlaylist, this, &MainWid::OnShowOrHidePlaylist);
     connect(ui->CtrlBarWid, &CtrlBar::SigPlaySeek, VideoCtl::GetInstance(), &VideoCtl::OnPlaySeek);
@@ -206,9 +214,10 @@ bool MainWid::ConnectSignalSlots()
     connect(VideoCtl::GetInstance(), &VideoCtl::SigVideoTotalSeconds, ui->CtrlBarWid, &CtrlBar::OnVideoTotalSeconds);
     connect(VideoCtl::GetInstance(), &VideoCtl::SigVideoPlaySeconds, ui->CtrlBarWid, &CtrlBar::OnVideoPlaySeconds);
     connect(VideoCtl::GetInstance(), &VideoCtl::SigVideoVolume, ui->CtrlBarWid, &CtrlBar::OnVideopVolume);
-    connect(VideoCtl::GetInstance(), &VideoCtl::SigPauseStat, ui->CtrlBarWid, &CtrlBar::OnPauseStat);
-    connect(VideoCtl::GetInstance(), &VideoCtl::SigStopFinished, ui->CtrlBarWid, &CtrlBar::OnStopFinished, Qt::DirectConnection);
-    connect(VideoCtl::GetInstance(), &VideoCtl::SigStopFinished, ui->ShowWid, &Show::OnStopFinished, Qt::DirectConnection);
+    connect(VideoCtl::GetInstance(), &VideoCtl::SigPauseStat, ui->CtrlBarWid, &CtrlBar::OnPauseStat, Qt::QueuedConnection);
+    connect(VideoCtl::GetInstance(), &VideoCtl::SigStopFinished, ui->CtrlBarWid, &CtrlBar::OnStopFinished, Qt::QueuedConnection);
+    connect(VideoCtl::GetInstance(), &VideoCtl::SigStopFinished, ui->ShowWid, &Show::OnStopFinished, Qt::QueuedConnection);
+    connect(VideoCtl::GetInstance(), &VideoCtl::SigFrameDimensionsChanged, ui->ShowWid, &Show::OnFrameDimensionsChanged, Qt::QueuedConnection);
     connect(VideoCtl::GetInstance(), &VideoCtl::SigStopFinished, &m_stTitle, &Title::OnStopFinished, Qt::DirectConnection);
     connect(VideoCtl::GetInstance(), &VideoCtl::SigStartPlay, &m_stTitle, &Title::OnPlay, Qt::DirectConnection);
 
@@ -228,7 +237,7 @@ bool MainWid::ConnectSignalSlots()
 }
 
 
-void MainWid::keyPressEvent(QKeyEvent *event)
+void MainWid::keyReleaseEvent(QKeyEvent *event)
 {
 // 	    // 是否按下Ctrl键      特殊按键
 //     if(event->modifiers() == Qt::ControlModifier){
@@ -236,7 +245,7 @@ void MainWid::keyPressEvent(QKeyEvent *event)
 //         if(event->key() == Qt::Key_M)
 //             ···
 //     }
-
+    qDebug() << "MainWid::keyPressEvent:" << event->key();
 	switch (event->key())
 	{
 	case Qt::Key_Return://全屏
@@ -246,6 +255,7 @@ void MainWid::keyPressEvent(QKeyEvent *event)
         emit SigSeekBack();
         break;
     case Qt::Key_Right://前进5s
+        qDebug() << "前进5s";
         emit SigSeekForward();
         break;
     case Qt::Key_Up://增加10音量
@@ -339,6 +349,8 @@ void MainWid::OnFullScreenPlay()
         m_stCtrlbarAnimationShow->start();
         m_bFullscreenCtrlBarShow = true;
         m_stFullscreenMouseDetectTimer.start();
+
+        this->setFocus();
     }
     else
     {
@@ -356,6 +368,7 @@ void MainWid::OnFullScreenPlay()
         ui->ShowWid->showNormal();
 
         m_stFullscreenMouseDetectTimer.stop();
+        this->setFocus();
     }
 }
 
